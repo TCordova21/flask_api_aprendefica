@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, request
+from sqlalchemy import func
 from app.models.user_model import User
 from app.schemas.user_schema import users_schema, user_schema, user_create_schema  
 from app import db
@@ -111,8 +112,8 @@ def create_user():
     try:
         data = request.get_json()
         user_data = user_create_schema.load(data)
-
-        if User.query.filter_by(usr_email=user_data.usr_email).first():
+        email_lower = user_data.usr_email.lower()
+        if User.query.filter(func.lower(User.usr_email) == email_lower).first():
             return jsonify({'error': 'El correo ya está registrado'}), 400
 
         hashed_password = bcrypt.generate_password_hash(
@@ -133,7 +134,11 @@ def create_user():
         return jsonify(user_schema.dump(new_user)), 201
 
     except Exception as e:
-        return jsonify({'error': f'Error al crear usuario: {str(e)}'}), 500
+        db.session.rollback()
+        if "UniqueViolation" in str(e) or "already exists" in str(e):
+            return jsonify({'error': 'El correo ya está registrado'}), 400
+            
+        return jsonify({'error': 'Error interno del servidor'}), 500
 
 from app import bcrypt
 
