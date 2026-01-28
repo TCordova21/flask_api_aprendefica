@@ -7,14 +7,13 @@ from config import Config
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager
 from flasgger import Swagger
-
+from flask_compress import Compress
 
 db = SQLAlchemy()
 ma = Marshmallow()
 bcrypt = Bcrypt()
 jwt = JWTManager()
-swagger = Swagger()
-from flasgger import Swagger
+compress = Compress()
 
 template = {
     "swagger": "2.0",
@@ -28,17 +27,15 @@ template = {
             "type": "apiKey",
             "name": "Authorization",
             "in": "header",
-            "description": "Token JWT. Usa el formato: **Bearer &lt;tu_token&gt;**"
+            "description": "Token JWT. Usa el formato: **Bearer <tu_token>**"
         }
     },
     "security": [
-        {
-            "Bearer": []
-        }
+        {"Bearer": []}
     ]
 }
-swagger = Swagger(template=template)
 
+swagger = Swagger(template=template)
 
 def create_app():
     app = Flask(__name__)
@@ -49,11 +46,12 @@ def create_app():
     bcrypt.init_app(app)
     jwt.init_app(app)
     swagger.init_app(app)
+    compress.init_app(app)
 
-    CORS(app, resources={r"/api/*": {"origins": "http://localhost:5173"}}, supports_credentials=True)
+    CORS(app)  # luego puedes restringir
+
     Migrate(app, db)
 
-    # Importar rutas
     from app.routes.user_routes import user_bp
     from app.routes.role_routes import role_bp
     from app.routes.course_routes import course_bp
@@ -63,7 +61,7 @@ def create_app():
     from app.routes.subtopic_routes import subtopic_bp
     from app.routes.learning_resource_routes import learning_resource_bp
     from app.routes.exercise_routes import exercise_bp
-    from app.routes.assessment_routes  import assessment_bp
+    from app.routes.assessment_routes import assessment_bp
     from app.routes.assessment_exercise_routes import assessment_exercise_bp
     from app.routes.diagnostic_session_routes import diagnostic_bp
     from app.routes.attempt_routes import attempt_bp
@@ -71,7 +69,7 @@ def create_app():
 
     app.register_blueprint(user_bp, url_prefix="/api/users")
     app.register_blueprint(role_bp, url_prefix="/api/roles")
-    app.register_blueprint(course_bp, url_prefix="/api/courses")    
+    app.register_blueprint(course_bp, url_prefix="/api/courses")
     app.register_blueprint(course_instance_bp, url_prefix="/api/course_instances")
     app.register_blueprint(enrollment_bp, url_prefix="/api/enrollments")
     app.register_blueprint(domain_bp, url_prefix="/api/domains")
@@ -83,8 +81,5 @@ def create_app():
     app.register_blueprint(diagnostic_bp, url_prefix="/api/diagnostic")
     app.register_blueprint(attempt_bp, url_prefix="/api/attempts")
     app.register_blueprint(attempt_exercise_bp, url_prefix="/api/exercise-attempts")
-    
-    
-
 
     return app
