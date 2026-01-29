@@ -236,10 +236,7 @@ def delete_user(user_id):
     except Exception as e:
         return jsonify({'error': f'Error al eliminar usuario: {str(e)}'}), 500
     
-
-# Rutas para manejar autenticación de usuarios
-# Estas rutas permiten iniciar sesión y obtener un token JWT
-
+   
 @user_bp.route('/login', methods=['POST'])
 def login():
     """
@@ -296,10 +293,12 @@ def login():
 
         user = User.query.filter_by(usr_email=email).first()
 
-        if not user or not bcrypt.check_password_hash(user.usr_password, password):
-            return jsonify({'error': 'Credenciales inválidas'}), 401
+        if not user:
+            return jsonify({'error': 'El correo no se encuentra registrado'}), 401
+        
+        if not bcrypt.check_password_hash(user.usr_password, password):
+            return jsonify({'error': 'La contraseña es incorrecta'}), 401
 
-        # Token válido por 1 día (puedes cambiarlo)
         access_token = create_access_token(
             identity=str(user.usr_id),
             expires_delta=timedelta(days=1)

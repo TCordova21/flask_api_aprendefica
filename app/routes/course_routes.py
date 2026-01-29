@@ -31,6 +31,36 @@ def get_all_courses():
     except Exception as e:
         return jsonify({'error': f'Error al obtener los cursos: {str(e)}'}), 500
 
+@course_bp.route('/published', methods=['GET'])
+def get_published_courses():
+    """
+    Obtener todos los cursos con estado 'publicado'
+    ---
+    tags:
+      - Cursos
+    responses:
+      200:
+        description: Lista de cursos disponibles para el público
+        schema:
+          type: array
+          items:
+            $ref: '#/definitions/Course'
+      500:
+        description: Error al filtrar los cursos
+    """
+    try:
+        # Filtramos directamente en la consulta a la base de datos
+        published_courses = Course.query.filter_by(cou_status='publicado').all()
+        
+        # Serializamos los resultados
+        result = courses_schema.dump(published_courses)
+        
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({
+            'error': 'Error al obtener los cursos publicados',
+            'details': str(e)
+        }), 500
 
 @course_bp.route('/<int:course_id>', methods=['GET'])
 def get_course(course_id):
@@ -127,58 +157,32 @@ def create_course():
 
     except Exception as e:
         db.session.rollback()
-        print("ERROR REAL:", e)  # 👈 ESTO te mostrará la causa exacta
+        print("ERROR REAL:", e)  
         return jsonify({'error': str(e)}), 500
-
+    
+    
 @course_bp.route('/<int:course_id>', methods=['PUT'])
 def update_course(course_id):
     """
-    Actualizar un curso por ID
-    ---
-    tags:
-      - Cursos
-    parameters:
-      - name: course_id
-        in: path
-        type: integer
-        required: true
-      - in: body
-        name: body
-        required: true
-        schema:
-          type: object
-          properties:
-            cou_course_name:
-              type: string
-            cou_description:
-              type: string
-            cou_duration:
-              type: integer
-            cou_difficulty_name:
-              type: string
-            cou_visibility_name:
-              type: string
-    responses:
-      200:
-        description: Curso actualizado exitosamente
-        schema:
-          $ref: '#/definitions/Course'
-      404:
-        description: Curso no encontrado
-      500:
-        description: Error al actualizar curso
+    Actualizar un curso (Incluyendo publicación)
     """
     try:
         course = Course.query.get_or_404(course_id)
         data = request.get_json()
+        
+        # Iteramos sobre los datos enviados (cou_course_name, cou_status, etc.)
         for key, value in data.items():
-            setattr(course, key, value)
+            if hasattr(course, key):
+                setattr(course, key, value)
+        
         db.session.commit()
         result = course_schema.dump(course)
         return jsonify(result), 200
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': f'Error al actualizar curso: {str(e)}'}), 500
-
+    
+    
 
 @course_bp.route('/<int:course_id>', methods=['DELETE'])
 def delete_course(course_id):

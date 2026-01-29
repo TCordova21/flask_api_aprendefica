@@ -321,3 +321,82 @@ def update_last_access(enr_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+    
+
+@enrollment_bp.route('/<int:enr_id>', methods=['GET'])
+@jwt_required()
+def get_enrollment_by_id(enr_id):
+    """
+    Obtener los detalles de una inscripción específica por su ID
+    ---
+    tags:
+      - Inscripciones
+    security:
+      - Bearer: []
+    parameters:
+      - in: path
+        name: enr_id
+        type: integer
+        required: true
+        description: ID único de la inscripción
+    responses:
+      200:
+        description: Detalles de la inscripción (incluye curso e instancia)
+        schema:
+          $ref: '#/definitions/Enrollment'
+      401:
+        description: No autorizado
+      403:
+        description: Prohibido (la inscripción no pertenece al usuario)
+      404:
+        description: Inscripción no encontrada
+      500:
+        description: Error interno del servidor
+    """
+    try:
+        user_id = get_jwt_identity()
+
+        # Buscamos la inscripción asegurándonos que pertenezca al usuario autenticado
+        enrollment = Enrollment.query.filter_by(
+            enr_id=enr_id, 
+            usr_id=user_id
+        ).first()
+
+        if not enrollment:
+            return jsonify({'error': 'Inscripción no encontrada o acceso denegado'}), 404
+
+        # Usamos enrollment_basic_schema o el que prefieras que incluya course_instance
+        return enrollment_basic_schema.jsonify(enrollment), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+    
+@enrollment_bp.route('/<int:enr_id>/performance', methods=['GET'])
+@jwt_required()
+def get_weekly_performance(enr_id):
+    """
+    Obtener el histórico de rendimiento semanal para la gráfica
+    ---
+    tags:
+      - Analítica
+    """
+    query = text("""
+        SELECT week_start, swp_score, swp_completed_exercises, swp_correct_attempts 
+        FROM student_weekly_performance 
+        WHERE enr_id = :enr_id 
+        ORDER BY week_start ASC
+    """)
+    
+    result = db.session.execute(query, {"enr_id": enr_id}).fetchall()
+    
+    performance_data = [
+        {
+            "week": r.week_start.strftime('%d %b'), 
+            "score": float(r.swp_score),
+            "exercises": r.swp_completed_exercises,
+            "correct": r.swp_correct_attempts
+        } for r in result
+    ]
+    
+    return jsonify(performance_data), 200

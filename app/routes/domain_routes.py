@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from app import db
 from app.models.domain_model import Domain
+from app.models.student_knowledge_state_model import StudentKnowledgeState
 from app.schemas.domain_schema import domain_schema, domains_schema 
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
@@ -83,48 +84,56 @@ def create_domain():
     return domain_schema.jsonify(domain), 201
 
 
-@domain_bp.route('/<int:dom_id>/graph', methods=['GET'])
-#@jwt_required()
-def get_domain_graph(dom_id):
-    """
-    Obtener grafo KST de un dominio
-    ---
-    tags:
-      - Currículo - KST
-    security:
-      - Bearer: []
-    parameters:
-      - name: dom_id
-        in: path
-        type: integer
-        required: true
-    responses:
-      200:
-        description: Grafo del dominio
-    """
-
+@domain_bp.route('/<int:dom_id>/graph/<int:enr_id>', methods=['GET'])
+def get_kst_graph(dom_id, enr_id):
     domain = Domain.query.get_or_404(dom_id)
+    
+    # 1. Obtener lo que el estudiante YA domina
+    mastered_records = StudentKnowledgeState.query.filter_by(
+        enr_id=enr_id, mastery_level='dominado'
+    ).all()
+    mastered_ids = {ms.sub_id for ms in mastered_records}
 
     nodes = []
     edges = []
 
+    # 2. Construir mapa de dependencias para el algoritmo KST
     for sub in domain.subtopics:
+        # Algoritmo de Frontera: ¿Están todos sus prerrequisitos dominados?
+        prereqs_ids = {p.sub_id for p in sub.prerequisites}
+        
+        # Un subtema está en la "Frontera" si:
+        # NO está dominado Y (No tiene prerrequisitos O todos sus prerrequisitos están dominados)
+        is_in_fringe = (sub.sub_id not in mastered_ids) and (prereqs_ids.issubset(mastered_ids))
+        
+        # Determinar estatus para el frontend
+        status = 'locked'
+        if sub.sub_id in mastered_ids:
+            status = 'completed'
+        elif is_in_fringe:
+            status = 'fringe' # ¡Esta es la zona de aprendizaje activo!
+
         nodes.append({
-            "id": sub.sub_id,
-            "label": sub.sub_name
+            "id": str(sub.sub_id),
+            "type": "kstNode",
+            "data": { 
+                "label": sub.sub_name,
+                "status": status,
+                "is_fringe": is_in_fringe
+            },
+            "position": {"x": 0, "y": 0}
         })
 
         for prereq in sub.prerequisites:
             edges.append({
-                "from": prereq.sub_id,
-                "to": sub.sub_id
+                "id": f"e{prereq.sub_id}-{sub.sub_id}",
+                "source": str(prereq.sub_id),
+                "target": str(sub.sub_id),
+                "animated": is_in_fringe, # Animamos el camino hacia la frontera
+                "style": { "stroke": "#cf3136" if sub.sub_id in mastered_ids else "#d1d5db" }
             })
 
-    return jsonify({
-        "nodes": nodes,
-        "edges": edges
-    }), 200
-
+    return jsonify({"nodes": nodes, "edges": edges}), 200
 
 @domain_bp.route("/<int:dom_id>", methods=["PUT"])
 @jwt_required()
