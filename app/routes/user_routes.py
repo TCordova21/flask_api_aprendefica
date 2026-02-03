@@ -10,11 +10,10 @@ from datetime import timedelta
 user_bp = Blueprint('user_bp', __name__)
 
 
-# Rutas para manejar usuarios
-# Estas rutas permiten crear, obtener, actualizar y eliminar usuarios
+
 
 @user_bp.route('/', methods=['GET'])
-@jwt_required()  # Requiere autenticación JWT para acceder a esta ruta
+@jwt_required()  
 def get_all_users():
 
     """
@@ -81,7 +80,7 @@ def get_user(user_id):
     
 
 @user_bp.route('/', methods=['POST'])
-@jwt_required()
+#@jwt_required()
 def create_user():
     """
     Crear un nuevo usuario
@@ -327,7 +326,7 @@ def login():
     # Estas rutas permiten obtener y actualizar el perfil del usuario autenticado
 
 @user_bp.route('/profile', methods=['GET'])
-@jwt_required()
+#@jwt_required()
 def get_profile():
 
     """
