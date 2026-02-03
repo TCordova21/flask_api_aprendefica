@@ -14,7 +14,7 @@ user_bp = Blueprint('user_bp', __name__)
 # Estas rutas permiten crear, obtener, actualizar y eliminar usuarios
 
 @user_bp.route('/', methods=['GET'])
-#@jwt_required()  # Requiere autenticación JWT para acceder a esta ruta
+@jwt_required()  # Requiere autenticación JWT para acceder a esta ruta
 def get_all_users():
 
     """
@@ -47,6 +47,7 @@ def get_all_users():
 
 
 @user_bp.route('/<int:user_id>', methods=['GET'])
+@jwt_required()
 def get_user(user_id):
 
     """
@@ -80,6 +81,7 @@ def get_user(user_id):
     
 
 @user_bp.route('/', methods=['POST'])
+@jwt_required()
 def create_user():
     """
     Crear un nuevo usuario
@@ -143,6 +145,7 @@ def create_user():
 from app import bcrypt
 
 @user_bp.route('/<int:user_id>', methods=['PUT'])
+@jwt_required()
 def update_user(user_id):
 
     """
@@ -205,6 +208,7 @@ def update_user(user_id):
 
 
 @user_bp.route('/<int:user_id>', methods=['DELETE'])
+@jwt_required()
 def delete_user(user_id):
 
     """

@@ -5,11 +5,36 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 from config import Config
 from flask_bcrypt import Bcrypt
-from flask_jwt_extended import JWTManager
+from flask_jwt_extended import JWTManager, get_jwt_identity, verify_jwt_in_request 
 from flasgger import Swagger
 from flask_compress import Compress
+from sqlalchemy import event 
 
 db = SQLAlchemy()
+
+# --- BLOQUE DE AUDITORÍA CENTRALIZADA ---
+@event.listens_for(db.session, "after_begin")
+def set_audit_user_context(session, transaction, connection):
+    """
+    Inyecta el ID del usuario en la sesión de PostgreSQL cada vez que 
+    comienza una transacción de SQLAlchemy.
+    """
+    try:
+  
+        verify_jwt_in_request(optional=True)
+        user_id = get_jwt_identity()
+
+        if user_id:
+           
+            connection.execute(
+                db.text("SET LOCAL app.current_user_id = :uid"), 
+                {"uid": str(user_id)}
+            )
+    except Exception:
+      
+        pass
+
+ma = Marshmallow()
 ma = Marshmallow()
 bcrypt = Bcrypt()
 jwt = JWTManager()
@@ -66,6 +91,7 @@ def create_app():
     from app.routes.diagnostic_session_routes import diagnostic_bp
     from app.routes.attempt_routes import attempt_bp
     from app.routes.exercise_attempt_routes import attempt_exercise_bp
+    from app.routes.audit_routes import audit_bp
 
     app.register_blueprint(user_bp, url_prefix="/api/users")
     app.register_blueprint(role_bp, url_prefix="/api/roles")
@@ -81,5 +107,6 @@ def create_app():
     app.register_blueprint(diagnostic_bp, url_prefix="/api/diagnostic")
     app.register_blueprint(attempt_bp, url_prefix="/api/attempts")
     app.register_blueprint(attempt_exercise_bp, url_prefix="/api/exercise-attempts")
+    app.register_blueprint(audit_bp, url_prefix="/api/audits")
 
     return app
